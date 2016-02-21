@@ -16,17 +16,18 @@ require '../vendor/autoload.php';
 require './User.php';
 
 try {
-    $app = new \Slim\App();
-    $container = $app->getContainer();
-    $container['auth'] = function($c) {
-        return new SlimAuth\Auth(function($id) {
-            return User::findOne($id);
-        }, [
-            'checkAcl' => function($currentUser, $acl) {
-                return $currentUser->allowAccess($acl);
-            }
-        ]);
-    };
+    $app = new \Slim\App([
+        'auth' => function($c) {
+            return new SlimAuth\Auth(function($id) {
+                return User::findOne($id);
+            }, [
+                'checkAcl' => function($currentUser, $acl) {
+                    return $currentUser->allowAccess($acl);
+                }
+            ]);
+        }
+    ]);
+    $auth = $app->getContainer()->get('auth');
 
     $app->get('/', function (Request $request, Response $response) {
         if ($this->get('auth')->getAuthenticated() !== null) {
@@ -40,18 +41,18 @@ try {
     $app->get('/admin', function (Request $request, Response $response) {
         $response->getBody()->write(file_get_contents(__DIR__.'/_index2.html'));
         return $response;
-    })->add(SlimAuth\Auth::secure('admin'));
+    })->add($auth->secure('admin'));
 
     $app->get('/private', function (Request $request, Response $response) {
         $response->getBody()->write(file_get_contents(__DIR__.'/_index2.html'));
         return $response;
-    })->add(SlimAuth\Auth::secure());
+    })->add($auth->secure());
 
     $app->post('/login', function (Request $request, Response $response) {
         $parsedBody = $request->getParsedBody();
         $user = User::findBy($parsedBody['user_cd']);
         if ($user && $user->authenticate($parsedBody['password'])) {
-            $this->get('auth')->permit($user->id, $user);
+            $this->get('auth')->permit($user->id);
         }
         return $response->withRedirect('/', 301);
     });
