@@ -4,7 +4,7 @@
   "description": "Slim Framework 3 Auth middleware",
   "license": "MIT",
   "require": {
-    "slim/slim": "^3.1"
+    "php": ">=5.5.0"
   },
   "scripts": {
     "test": "phpunit"
@@ -20,6 +20,7 @@
     }
   },
   "require-dev": {
+    "slim/slim": "~3.1",
     "phpunit/phpunit": "^4.8"
   }
 }
