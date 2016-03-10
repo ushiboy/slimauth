@@ -1,5 +1,7 @@
 # Auth Middleware for Slim
 
+[![Build Status](https://travis-ci.org/ushiboy/slimauth.svg?branch=master)](https://travis-ci.org/ushiboy/slimauth)
+
 Unofficial auth middleware for Slim Framework.
 
 apply authentication and authorization settings to each route.
