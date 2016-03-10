@@ -57,7 +57,7 @@ class AuthTest extends \PHPUnit_Framework_TestCase
     /**
      * @expectedException LogicException
      */
-    public function test_initialize__settings_not_callable_matchAcl()
+    public function testConstructor__when_matchAcl_setting_is_not_callable()
     {
         new Auth($this->findTarget, [
             'checkAcl' => true
@@ -67,22 +67,33 @@ class AuthTest extends \PHPUnit_Framework_TestCase
     /**
      * @expectedException LogicException
      */
-    public function test_initialize__settings_not_callable_failure()
+    public function testConstructor__when_failure_setting_is_not_callable()
     {
         new Auth($this->findTarget, [
             'failure' => true
         ]);
     }
 
-    public function test_permit()
+    public function testPermit()
     {
         $user = $this->user;
         $auth = new Auth($this->findTarget);
-        $auth->permit($user->id, $user);
+        $auth->permit($user->id);
         $this->assertEquals($user->id, $_SESSION[Auth::SESSION_KEY]);
     }
 
-    public function test_clear()
+    public function testPermit__when_use_extra_sessionKey()
+    {
+        $user = $this->user;
+        $myKey = 'MyKEY';
+        $auth = new Auth($this->findTarget, [
+            'sessionKey' => $myKey
+        ]);
+        $auth->permit($user->id);
+        $this->assertEquals($user->id, $_SESSION[$myKey]);
+    }
+
+    public function testClear()
     {
         $_SESSION[Auth::SESSION_KEY] = $this->user->id;
         $auth = new Auth($this->findTarget);
@@ -90,26 +101,22 @@ class AuthTest extends \PHPUnit_Framework_TestCase
         $this->assertNull($_SESSION[Auth::SESSION_KEY]);
     }
 
-    public function test_intercept()
+    public function testIntercept()
     {
         $_SESSION[Auth::SESSION_KEY] = $this->user->id;
         $auth = new Auth($this->findTarget);
-        $resultUser = [];
         $next = function($request, $response) use (&$resultUser) {
-            $resultUser = $request->getAttribute(Auth::ATTRIBUTE_NAME);
             $response->getBody()->write('OK');
             return $response->withStatus(200);
         };
         $response = $auth->intercept($this->request, $this->response, $next);
         $this->assertEquals('OK', $response->getBody());
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals($this->user, $resultUser);
     }
 
-    public function test_intercept__with_acl()
+    public function testIntercept__when_use_acl()
     {
         $_SESSION[Auth::SESSION_KEY] = $this->user->id;
-        $resultUser = [];
         $resultAcl = [];
         $auth = new Auth($this->findTarget, [
             'checkAcl' => function($target, $acl) use(&$resultAcl) {
@@ -118,18 +125,16 @@ class AuthTest extends \PHPUnit_Framework_TestCase
             }
         ]);
         $next = function($request, $response) use (&$resultUser) {
-            $resultUser = $request->getAttribute(Auth::ATTRIBUTE_NAME);
             $response->getBody()->write('OK');
             return $response->withStatus(200);
         };
         $response = $auth->intercept($this->request, $this->response, $next, 'admin');
         $this->assertEquals('OK', $response->getBody());
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals($this->user, $resultUser);
         $this->assertEquals(['admin'], $resultAcl);
     }
 
-    public function test_intercept__with_failure()
+    public function testIntercept__when_failure()
     {
         $auth = new Auth($this->findTarget);
         $next = function($request, $response) {
@@ -141,7 +146,7 @@ class AuthTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(403, $response->getStatusCode());
     }
 
-    public function test_intercept__with_acl_check_fail()
+    public function testIntercept__when_acl_failure()
     {
         $_SESSION[Auth::SESSION_KEY] = $this->user->id;
         $resultAcl = [];
@@ -161,10 +166,61 @@ class AuthTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(['group1', 'group2'], $resultAcl);
     }
 
-    public function test_getAuthenticated()
+    public function testIntercept__when_use_extra_failure()
+    {
+        $auth = new Auth($this->findTarget, [
+            'failure' => function($request, $response) {
+                return $response->withRedirect('/', 301);
+            }
+        ]);
+        $next = function($request, $response) {
+            $response->getBody()->write('OK');
+            return $response->withStatus(200);
+        };
+        $response = $auth->intercept($this->request, $this->response, $next);
+        $this->assertEquals(301, $response->getStatusCode());
+    }
+
+    public function testSecure()
+    {
+        $_SESSION[Auth::SESSION_KEY] = $this->user->id;
+        $auth = new Auth($this->findTarget);
+        $next = function($request, $response) use (&$resultUser) {
+            $response->getBody()->write('OK');
+            return $response->withStatus(200);
+        };
+        $fn = $auth->secure();
+        $response = $fn($this->request, $this->response, $next);
+        $this->assertEquals('OK', $response->getBody());
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testSecure__when_use_acl()
+    {
+        $_SESSION[Auth::SESSION_KEY] = $this->user->id;
+        $resultAcl = [];
+        $auth = new Auth($this->findTarget, [
+            'checkAcl' => function($target, $acl) use(&$resultAcl) {
+                $resultAcl = $acl;
+                return true;
+            }
+        ]);
+        $next = function($request, $response) use (&$resultUser) {
+            $response->getBody()->write('OK');
+            return $response->withStatus(200);
+        };
+        $fn = $auth->secure('admin');
+        $response = $fn($this->request, $this->response, $next);
+        $this->assertEquals('OK', $response->getBody());
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(['admin'], $resultAcl);
+    }
+
+    public function testGetAuthenticated()
     {
         $_SESSION[Auth::SESSION_KEY] = $this->user->id;
         $auth = new Auth($this->findTarget);
         $this->assertEquals($this->user, $auth->getAuthenticated());
     }
+
 }
